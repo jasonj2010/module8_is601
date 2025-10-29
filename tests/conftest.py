@@ -5,7 +5,7 @@ import sys
 import os
 import signal
 import pytest
-from playwright.sync_api import sync_playwright  # ✅ Added import
+from playwright.sync_api import sync_playwright
 
 @pytest.fixture(scope='session')
 def fastapi_server():
@@ -65,8 +65,14 @@ def playwright_instance_fixture():
 def browser(playwright_instance_fixture):
     """
     Fixture to launch a browser instance.
+    Tries bundled Chromium first; if the browser download is blocked or missing,
+    falls back to the locally installed Microsoft Edge via channel="msedge".
     """
-    browser = playwright_instance_fixture.chromium.launch(headless=True)
+    try:
+        browser = playwright_instance_fixture.chromium.launch(headless=True)
+    except Exception as e:
+        print(f"[playwright] Chromium launch failed ({e}); trying Edge channel…")
+        browser = playwright_instance_fixture.chromium.launch(channel="msedge", headless=True)
     yield browser
     browser.close()
 
