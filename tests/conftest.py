@@ -1,29 +1,28 @@
-# tests/e2e/conftest.py
-
 import subprocess
 import time
-import pytest
-from playwright.sync_api import sync_playwright
 import requests
+import sys
+import os
+import signal
+import pytest
 
 @pytest.fixture(scope='session')
 def fastapi_server():
     """
-    Fixture to start the FastAPI server before E2E tests and stop it after tests complete.
+    Start the FastAPI server with the SAME Python interpreter running pytest.
+    Ensures imports (fastapi, uvicorn, etc.) resolve in your venv.
     """
-    # Start FastAPI app
-    fastapi_process = subprocess.Popen(['python', 'main.py'])
-    
-    # Define the URL to check if the server is up
+    env = os.environ.copy()
+    # If you need to tweak env for Windows you can do it here.
+    fastapi_process = subprocess.Popen([sys.executable, 'main.py'], env=env)
+
     server_url = 'http://127.0.0.1:8000/'
-    
-    # Wait for the server to start by polling the root endpoint
-    timeout = 30  # seconds
+    timeout = 45  # a little more generous on Windows
     start_time = time.time()
     server_up = False
-    
+
     print("Starting FastAPI server...")
-    
+
     while time.time() - start_time < timeout:
         try:
             response = requests.get(server_url)
@@ -34,18 +33,24 @@ def fastapi_server():
         except requests.exceptions.ConnectionError:
             pass
         time.sleep(1)
-    
+
     if not server_up:
         fastapi_process.terminate()
+        fastapi_process.wait(timeout=10)
         raise RuntimeError("FastAPI server failed to start within timeout period.")
-    
+
     yield
-    
-    # Terminate FastAPI server
-    print("Shutting down FastAPI server...")
-    fastapi_process.terminate()
-    fastapi_process.wait()
-    print("FastAPI server has been terminated.")
+
+    # Teardown
+    if os.name == "nt":
+        fastapi_process.terminate()
+    else:
+        fastapi_process.send_signal(signal.SIGINT)
+    try:
+        fastapi_process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        fastapi_process.kill()
+
 
 @pytest.fixture(scope="session")
 def playwright_instance_fixture():
