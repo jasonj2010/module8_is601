@@ -5,6 +5,7 @@ import sys
 import os
 import signal
 import pytest
+from playwright.sync_api import sync_playwright  # ✅ Added import
 
 @pytest.fixture(scope='session')
 def fastapi_server():
@@ -13,11 +14,10 @@ def fastapi_server():
     Ensures imports (fastapi, uvicorn, etc.) resolve in your venv.
     """
     env = os.environ.copy()
-    # If you need to tweak env for Windows you can do it here.
     fastapi_process = subprocess.Popen([sys.executable, 'main.py'], env=env)
 
     server_url = 'http://127.0.0.1:8000/'
-    timeout = 45  # a little more generous on Windows
+    timeout = 45  # generous for Windows
     start_time = time.time()
     server_up = False
 
@@ -60,6 +60,7 @@ def playwright_instance_fixture():
     with sync_playwright() as p:
         yield p
 
+
 @pytest.fixture(scope="session")
 def browser(playwright_instance_fixture):
     """
@@ -68,6 +69,7 @@ def browser(playwright_instance_fixture):
     browser = playwright_instance_fixture.chromium.launch(headless=True)
     yield browser
     browser.close()
+
 
 @pytest.fixture(scope="function")
 def page(browser):
